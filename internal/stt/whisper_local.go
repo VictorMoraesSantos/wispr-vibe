@@ -38,6 +38,28 @@ func NewWhisperLocal(execPath, modelPath string, useGPU bool) (*WhisperLocal, er
 
 func (w *WhisperLocal) Name() string { return "whisper_local" }
 
+// HasGPUSupport reports whether this whisper-cli binary was compiled with CUDA.
+// It runs the binary with --help and looks for CUDA/GPU mentions in the output.
+func (w *WhisperLocal) HasGPUSupport() bool {
+	cmd := exec.Command(w.execPath, "--help")
+	out, _ := cmd.CombinedOutput()
+	lower := strings.ToLower(string(out))
+	return strings.Contains(lower, "cuda") || strings.Contains(lower, "gpu") || strings.Contains(lower, "ggml_cuda")
+}
+
+// CheckGPUSupport probes a whisper-cli binary for CUDA support without
+// constructing a full WhisperLocal. Returns false if the binary can't be run.
+func CheckGPUSupport(execPath string) bool {
+	if execPath == "" {
+		execPath = findWhisperExe()
+	}
+	if execPath == "" {
+		return false
+	}
+	w := &WhisperLocal{execPath: execPath}
+	return w.HasGPUSupport()
+}
+
 func (w *WhisperLocal) buildArgs(audioFile, lang string) []string {
 	if lang == "" {
 		lang = "auto"

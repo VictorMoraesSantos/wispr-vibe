@@ -105,7 +105,42 @@ Download models from [huggingface.co/ggerganov/whisper.cpp](https://huggingface.
 
 Place in `~/.wispr-vibe/models/`. The app auto-detects the best available model.
 
-## Architecture
+## GPU Acceleration (CUDA)
+
+The `Use GPU acceleration` toggle in Settings only works if your `whisper-cli.exe` was compiled with CUDA support. A standard pre-built binary **does not have GPU support** — the flag will appear disabled in Settings.
+
+### How to get a CUDA-enabled whisper-cli
+
+**Option 1 — Auto (recommended):** use the included build script:
+
+```powershell
+# Requires: CUDA Toolkit, CMake, Git
+.\build.ps1
+```
+
+This clones `whisper.cpp`, compiles it with `-DGGML_CUDA=ON`, downloads the model, and places everything in `dist\bin\`.
+
+**Option 2 — Manual:**
+
+```powershell
+git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
+cd whisper.cpp
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
+cmake --build build --config Release --parallel
+
+# Copy the binary
+copy build\bin\Release\whisper-cli.exe %USERPROFILE%\.wispr-vibe\
+```
+
+**Option 3 — CPU only (no CUDA needed):**
+
+Leave `Use GPU acceleration` unchecked. Whisper still runs well on CPU — a `ggml-small` model takes ~4-6s per transcription.
+
+### Verify GPU support
+
+In Settings, the GPU section shows:
+- **"whisper-cli has CUDA support"** — GPU is available, toggle works
+- **"NOT compiled with CUDA"** — need to recompile with `build.ps1`
 
 ```
 Hotkey → Audio Capture → STT Engine → Text Processor → Clipboard + Paste

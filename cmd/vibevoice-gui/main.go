@@ -19,6 +19,7 @@ import (
 	"github.com/victorlui/wispr-vibe/internal/config"
 	"github.com/victorlui/wispr-vibe/internal/hotkey"
 	"github.com/victorlui/wispr-vibe/internal/logger"
+	"github.com/victorlui/wispr-vibe/internal/stt"
 	"github.com/victorlui/wispr-vibe/internal/toast"
 )
 
@@ -274,13 +275,21 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 	})
 	gpuCheck.SetChecked(cfg.UseGPU)
 
-	gpuHint := widget.NewLabelWithStyle(
-		"Requires CUDA-enabled whisper-cli. Restart after changing.",
-		fyne.TextAlignLeading,
-		fyne.TextStyle{Italic: true},
-	)
-	gpuHint.Importance = widget.LowImportance
-	gpuHint.Wrapping = fyne.TextWrapWord
+	gpuAvailable := stt.CheckGPUSupport(cfg.WhisperExePath)
+	var gpuStatusText string
+	var gpuStatusImportance widget.Importance
+	if gpuAvailable {
+		gpuStatusText = "whisper-cli has CUDA support — GPU acceleration is available."
+		gpuStatusImportance = widget.SuccessImportance
+	} else {
+		gpuStatusText = "whisper-cli was NOT compiled with CUDA. GPU flag has no effect.\nRun build.ps1 to compile a CUDA-enabled binary."
+		gpuStatusImportance = widget.WarningImportance
+		gpuCheck.Disable()
+	}
+
+	gpuStatus := widget.NewLabelWithStyle(gpuStatusText, fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+	gpuStatus.Importance = gpuStatusImportance
+	gpuStatus.Wrapping = fyne.TextWrapWord
 
 	saveStatus := widget.NewLabel("")
 
@@ -328,7 +337,7 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 		widget.NewLabelWithStyle("Performance", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		spacer(4),
 		gpuCheck,
-		gpuHint,
+		gpuStatus,
 	)
 
 	helpHint := widget.NewLabelWithStyle(
