@@ -86,20 +86,11 @@ func (a *App) StopAndProcess(ctx context.Context) (string, error) {
 	text := a.pipeline.Process(result.Text)
 	a.log.Debug("processed text", "text", text)
 
-	// Clipboard
-	if err := clipboard.Copy(text); err != nil {
-		return text, fmt.Errorf("copy to clipboard: %w", err)
-	}
-	a.log.Info("text copied to clipboard")
-
-	// Auto-paste if configured
-	if a.cfg.AutoPaste {
-		time.Sleep(100 * time.Millisecond) // small delay for clipboard sync
-		if err := clipboard.Paste(); err != nil {
-			a.log.Warn("auto-paste failed", "error", err)
-		} else {
-			a.log.Info("auto-pasted")
-		}
+	// Type text into active window (copy to clipboard + Ctrl+V)
+	if err := clipboard.TypeText(text); err != nil {
+		a.log.Warn("auto-type failed, text is in clipboard", "error", err)
+	} else {
+		a.log.Info("text typed into active window")
 	}
 
 	return text, nil

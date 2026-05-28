@@ -1,3 +1,5 @@
+//go:build !windows
+
 package clipboard
 
 import (
@@ -10,12 +12,9 @@ import (
 // Copy places text on the system clipboard.
 func Copy(text string) error {
 	switch runtime.GOOS {
-	case "windows":
-		return runCmd("clip", text)
 	case "darwin":
 		return runCmd("pbcopy", text)
 	case "linux":
-		// Try xclip first, fallback to xsel
 		if err := runCmd("xclip", text, "-selection", "clipboard"); err != nil {
 			return runCmd("xsel", text, "--clipboard", "--input")
 		}
@@ -26,13 +25,8 @@ func Copy(text string) error {
 }
 
 // Paste simulates Ctrl+V to paste clipboard content.
-// On Windows uses PowerShell SendKeys.
 func Paste() error {
 	switch runtime.GOOS {
-	case "windows":
-		cmd := exec.Command("powershell", "-Command",
-			`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v")`)
-		return cmd.Run()
 	case "darwin":
 		cmd := exec.Command("osascript", "-e",
 			`tell application "System Events" to keystroke "v" using command down`)
@@ -43,6 +37,24 @@ func Paste() error {
 	default:
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
+}
+
+// TypeText copies text and pastes into active window.
+func TypeText(text string) error {
+	if err := Copy(text); err != nil {
+		return err
+	}
+	return Paste()
+}
+
+// CopyToClipboard is an alias for Copy on non-Windows.
+func CopyToClipboard(text string) error {
+	return Copy(text)
+}
+
+// PasteToActiveWindow is an alias for Paste on non-Windows.
+func PasteToActiveWindow() error {
+	return Paste()
 }
 
 func runCmd(name string, input string, args ...string) error {
