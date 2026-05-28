@@ -9,11 +9,11 @@ func TestFormatRecordingText(t *testing.T) {
 		seconds int
 		expect  string
 	}{
-		{0, "🎙 Recording... 0s"},
-		{1, "🎙 Recording... 1s"},
-		{5, "🎙 Recording... 5s"},
-		{30, "🎙 Recording... 30s"},
-		{120, "🎙 Recording... 120s"},
+		{0, "Recording  0s"},
+		{1, "Recording  1s"},
+		{5, "Recording  5s"},
+		{30, "Recording  30s"},
+		{120, "Recording  120s"},
 	}
 
 	for _, tt := range tests {
