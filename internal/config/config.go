@@ -37,6 +37,9 @@ type Config struct {
 	// Log level: debug, info, warn, error
 	LogLevel string `json:"log_level"`
 
+	// Hotkey for push-to-talk toggle (e.g. "Ctrl+Shift+R")
+	Hotkey string `json:"hotkey"`
+
 	// Post-processing
 	RemoveFillers   bool `json:"remove_fillers"`
 	FixPunctuation  bool `json:"fix_punctuation"`
@@ -51,6 +54,7 @@ func Default() *Config {
 		SampleRate:     16000,
 		Language:       "",
 		LogLevel:       "info",
+		Hotkey:         "Ctrl+Shift+R",
 		RemoveFillers:  true,
 		FixPunctuation: true,
 		AutoPaste:      false,

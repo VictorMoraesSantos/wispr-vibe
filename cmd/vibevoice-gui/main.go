@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -47,8 +48,14 @@ func main() {
 	w.Resize(fyne.NewSize(420, 320))
 	w.CenterOnScreen()
 
+	// Hotkey combo from config
+	hotkeyCombo := cfg.Hotkey
+	if hotkeyCombo == "" {
+		hotkeyCombo = "Ctrl+Shift+R"
+	}
+
 	// UI widgets
-	statusLabel := widget.NewLabel("🟢 Ready — press Ctrl+Shift+R or click Record")
+	statusLabel := widget.NewLabel(fmt.Sprintf("🟢 Ready — press %s or click Record", hotkeyCombo))
 	statusLabel.Alignment = fyne.TextAlignCenter
 	statusLabel.TextStyle = fyne.TextStyle{Bold: true}
 
@@ -75,7 +82,7 @@ func main() {
 			recording = true
 			recordStart = time.Now()
 			recordBtn.SetText("⏹ Stop & Transcribe")
-			statusLabel.SetText("🎙 Recording... (Ctrl+Shift+R to stop)")
+			statusLabel.SetText(fmt.Sprintf("🎙 Recording... (%s to stop)", hotkeyCombo))
 			resultLabel.SetText("")
 
 			timerDone = make(chan struct{})
@@ -123,17 +130,33 @@ func main() {
 
 	recordBtn.OnTapped = toggleRecording
 
-	// Register global hotkey: Ctrl+Shift+R (VK_R = 0x52)
-	hk, err := hotkey.Register(1, hotkey.ModControl|hotkey.ModShift, 0x52, toggleRecording)
+	// Register global hotkey from config
+	hk, err := hotkey.RegisterFromString(1, hotkeyCombo, toggleRecording)
 	if err != nil {
-		log.Warn("global hotkey registration failed", "error", err)
+		log.Warn("global hotkey registration failed", "error", err, "hotkey", hotkeyCombo)
 	} else {
-		log.Info("global hotkey registered: Ctrl+Shift+R")
+		log.Info("global hotkey registered", "hotkey", hotkeyCombo)
 	}
 
 	// Settings button
 	settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
-		showSettings(a, cfg)
+		showSettings(a, cfg, w, func() {
+			// Re-register hotkey after settings change
+			if hk != nil {
+				hk.Unregister()
+			}
+			newCombo := cfg.Hotkey
+			if newCombo == "" {
+				newCombo = "Ctrl+Shift+R"
+			}
+			newHk, err := hotkey.RegisterFromString(1, newCombo, toggleRecording)
+			if err != nil {
+				log.Warn("hotkey re-register failed", "error", err)
+			} else {
+				hk = newHk
+				log.Info("hotkey updated", "hotkey", newCombo)
+			}
+		})
 	})
 
 	// Minimize button
@@ -149,7 +172,7 @@ func main() {
 		settingsBtn,
 	)
 
-	hotkeyHint := widget.NewLabel("Global hotkey: Ctrl+Shift+R (works from any app)")
+	hotkeyHint := widget.NewLabel(fmt.Sprintf("Hotkey: %s (works from any app)", hotkeyCombo))
 	hotkeyHint.Alignment = fyne.TextAlignCenter
 	hotkeyHint.TextStyle = fyne.TextStyle{Italic: true}
 
@@ -196,27 +219,75 @@ func main() {
 	}
 }
 
-func showSettings(a fyne.App, cfg *config.Config) {
+func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyChanged func()) {
 	w := a.NewWindow("Settings")
-	w.Resize(fyne.NewSize(380, 280))
+	w.Resize(fyne.NewSize(420, 350))
 
 	engineText := cfg.STTEngine
 	if engineText == "whisper_local" {
 		engineText = "Local Whisper (offline)"
 	}
 
+	currentHotkey := cfg.Hotkey
+	if currentHotkey == "" {
+		currentHotkey = "Ctrl+Shift+R"
+	}
+
+	// Hotkey entry
+	hotkeyEntry := widget.NewEntry()
+	hotkeyEntry.SetText(currentHotkey)
+	hotkeyEntry.SetPlaceHolder("Ex: Ctrl+Shift+R, Alt+Z, Ctrl+F9")
+
+	hotkeyHelp := widget.NewLabel("Format: Modifier+Key (Ctrl, Shift, Alt, Win + any key)")
+	hotkeyHelp.TextStyle = fyne.TextStyle{Italic: true}
+	hotkeyHelp.Wrapping = fyne.TextWrapWord
+
+	saveStatus := widget.NewLabel("")
+
+	saveBtn := widget.NewButton("💾 Save Hotkey", func() {
+		newCombo := strings.TrimSpace(hotkeyEntry.Text)
+		if newCombo == "" {
+			saveStatus.SetText("❌ Hotkey cannot be empty")
+			return
+		}
+
+		// Validate
+		_, _, err := hotkey.ParseHotkey(newCombo)
+		if err != nil {
+			saveStatus.SetText(fmt.Sprintf("❌ Invalid: %v", err))
+			return
+		}
+
+		cfg.Hotkey = newCombo
+		if err := config.Save(cfg, ""); err != nil {
+			saveStatus.SetText(fmt.Sprintf("❌ Save failed: %v", err))
+			return
+		}
+
+		saveStatus.SetText(fmt.Sprintf("✅ Hotkey saved: %s", newCombo))
+
+		// Notify to re-register
+		if onHotkeyChanged != nil {
+			onHotkeyChanged()
+		}
+	})
+	saveBtn.Importance = widget.HighImportance
+
 	info := container.NewVBox(
-		widget.NewLabelWithStyle("Configuration", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("⚙️ Configuration", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
 		widget.NewSeparator(),
 		widget.NewLabel(fmt.Sprintf("Engine: %s", engineText)),
 		widget.NewLabel(fmt.Sprintf("Provider: %s", orDefault(cfg.Provider, "local"))),
 		widget.NewLabel(fmt.Sprintf("Language: %s", orDefault(cfg.Language, "auto-detect"))),
-		widget.NewLabel(fmt.Sprintf("Model: %s", orDefault(cfg.WhisperModel, "base"))),
 		widget.NewSeparator(),
-		widget.NewLabel("Hotkey: Ctrl+Shift+R (toggle record)"),
+		widget.NewLabelWithStyle("🎹 Push-to-Talk Hotkey", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		hotkeyHelp,
+		hotkeyEntry,
+		saveBtn,
+		saveStatus,
 		widget.NewSeparator(),
-		widget.NewLabel("To reconfigure: delete ~/.wispr-vibe/config.json"),
-		widget.NewLabel("and restart the app."),
+		widget.NewLabel("Press hotkey once → start recording"),
+		widget.NewLabel("Press again → stop & transcribe to cursor"),
 	)
 
 	w.SetContent(container.NewPadded(info))
