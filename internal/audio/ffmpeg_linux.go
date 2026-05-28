@@ -2,7 +2,10 @@
 
 package audio
 
-import "fmt"
+import (
+	"fmt"
+	"os/exec"
+)
 
 // buildFFmpegArgs returns ffmpeg arguments for capturing audio on Linux.
 func buildFFmpegArgs(sampleRate int) []string {
@@ -16,4 +19,11 @@ func buildFFmpegArgs(sampleRate int) []string {
 		"-f", "wav",
 		"pipe:1",
 	}
+}
+
+func findFFmpeg() string {
+	if p, err := exec.LookPath("ffmpeg"); err == nil {
+		return p
+	}
+	return ""
 }

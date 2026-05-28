@@ -9,19 +9,20 @@ import (
 )
 
 // Recorder captures audio from the default input device using ffmpeg.
-// This avoids CGo dependency — just needs ffmpeg in PATH.
 type Recorder struct {
-	sampleRate int
-	cmd        *exec.Cmd
-	buf        bytes.Buffer
-	mu         sync.Mutex
-	recording  bool
-	done       chan struct{}
+	sampleRate  int
+	ffmpegPath  string
+	cmd         *exec.Cmd
+	buf         bytes.Buffer
+	mu          sync.Mutex
+	recording   bool
+	done        chan struct{}
 }
 
 func NewRecorder(sampleRate int) *Recorder {
 	return &Recorder{
 		sampleRate: sampleRate,
+		ffmpegPath: findFFmpeg(),
 	}
 }
 
@@ -33,18 +34,20 @@ func (r *Recorder) Start() error {
 		return fmt.Errorf("already recording")
 	}
 
-	// Use ffmpeg to capture from default audio input device
-	// On Windows: dshow; On Linux: pulse/alsa; On macOS: avfoundation
+	if r.ffmpegPath == "" {
+		return fmt.Errorf("ffmpeg not found. Install it: winget install ffmpeg")
+	}
+
 	r.buf.Reset()
 	r.done = make(chan struct{})
 
 	args := buildFFmpegArgs(r.sampleRate)
-	r.cmd = exec.Command("ffmpeg", args...)
+	r.cmd = exec.Command(r.ffmpegPath, args...)
 	r.cmd.Stdout = &r.buf
-	r.cmd.Stderr = nil // suppress ffmpeg stderr noise
+	r.cmd.Stderr = nil
 
 	if err := r.cmd.Start(); err != nil {
-		return fmt.Errorf("start ffmpeg: %w (is ffmpeg installed?)", err)
+		return fmt.Errorf("start ffmpeg: %w", err)
 	}
 
 	r.recording = true
