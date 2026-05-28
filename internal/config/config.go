@@ -208,9 +208,3 @@ func readLine(reader *bufio.Reader) string {
 	return strings.TrimSpace(line)
 }
 
-func orDefault(val, def string) string {
-	if val == "" {
-		return def
-	}
-	return val
-}

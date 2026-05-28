@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/victorlui/wispr-vibe/pkg/domain"
@@ -76,23 +77,19 @@ func TestWhisperAPIDefaultURL(t *testing.T) {
 }
 
 func TestWhisperAPITranscribeSuccess(t *testing.T) {
-	// Mock server that returns a valid response
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify request structure
 		if r.Method != "POST" {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if !hasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
 			t.Errorf("missing Bearer auth header")
 		}
 		contentType := r.Header.Get("Content-Type")
-		if !hasPrefix(contentType, "multipart/form-data") {
+		if !strings.HasPrefix(contentType, "multipart/form-data") {
 			t.Errorf("expected multipart, got %s", contentType)
 		}
 
-		// Parse multipart to verify fields
-		err := r.ParseMultipartForm(10 << 20)
-		if err != nil {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			t.Fatalf("parse multipart: %v", err)
 		}
 		if r.FormValue("model") != "whisper-1" {
@@ -105,14 +102,12 @@ func TestWhisperAPITranscribeSuccess(t *testing.T) {
 			t.Errorf("response_format = %q, want json", r.FormValue("response_format"))
 		}
 
-		// Verify file was uploaded
 		file, _, err := r.FormFile("file")
 		if err != nil {
 			t.Fatalf("no file uploaded: %v", err)
 		}
 		file.Close()
 
-		// Return mock response
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"text": "Olá mundo este é um teste",
@@ -149,37 +144,23 @@ func TestWhisperAPITranscribeError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 401 response")
 	}
-	if !hasSubstring(err.Error(), "401") {
+	if !strings.Contains(err.Error(), "401") {
 		t.Errorf("error should mention 401: %v", err)
 	}
 }
 
 func TestWhisperAPITranscribeCanceled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulate slow response — context should cancel before we respond
 		<-r.Context().Done()
 	}))
 	defer server.Close()
 
 	api := NewWhisperAPI("key", server.URL, "whisper-1")
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
+	cancel()
 
 	_, err := api.Transcribe(ctx, []byte("audio"), domain.TranscribeOpts{})
 	if err == nil {
 		t.Fatal("expected error for canceled context")
 	}
-}
-
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
-}
-
-func hasSubstring(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

@@ -187,6 +187,34 @@ func TestEnvOverridePriority(t *testing.T) {
 	}
 }
 
+func TestDefaultUseGPU(t *testing.T) {
+	cfg := Default()
+	if !cfg.UseGPU {
+		t.Error("UseGPU should default to true")
+	}
+}
+
+func TestSaveLoadUseGPU(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config.json")
+
+	cfg := Default()
+	cfg.WhisperAPIKey = "key"
+	cfg.UseGPU = false
+
+	if err := Save(cfg, cfgPath); err != nil {
+		t.Fatalf("Save error: %v", err)
+	}
+
+	loaded, err := Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	if loaded.UseGPU {
+		t.Error("UseGPU=false should round-trip correctly, got true")
+	}
+}
+
 func TestEnvOverrideURL(t *testing.T) {
 	os.Setenv("WISPR_API_URL", "https://custom.api/v1/transcriptions")
 	defer os.Unsetenv("WISPR_API_URL")

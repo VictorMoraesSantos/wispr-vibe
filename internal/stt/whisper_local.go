@@ -38,6 +38,23 @@ func NewWhisperLocal(execPath, modelPath string, useGPU bool) (*WhisperLocal, er
 
 func (w *WhisperLocal) Name() string { return "whisper_local" }
 
+func (w *WhisperLocal) buildArgs(audioFile, lang string) []string {
+	if lang == "" {
+		lang = "auto"
+	}
+	args := []string{
+		"-m", w.modelPath,
+		"-f", audioFile,
+		"--no-timestamps",
+		"--output-txt",
+	}
+	if !w.useGPU {
+		args = append(args, "-ng")
+	}
+	args = append(args, "-l", lang)
+	return args
+}
+
 func (w *WhisperLocal) Transcribe(ctx context.Context, audio []byte, opts domain.TranscribeOpts) (*domain.TranscribeResult, error) {
 	start := time.Now()
 
@@ -53,23 +70,7 @@ func (w *WhisperLocal) Transcribe(ctx context.Context, audio []byte, opts domain
 	}
 	tmpFile.Close()
 
-	args := []string{
-		"-m", w.modelPath,
-		"-f", tmpFile.Name(),
-		"--no-timestamps",
-		"--output-txt",
-	}
-
-	if !w.useGPU {
-		args = append(args, "-ng")
-	}
-
-	lang := opts.Language
-	if lang == "" {
-		lang = "auto"
-	}
-	args = append(args, "-l", lang)
-
+	args := w.buildArgs(tmpFile.Name(), opts.Language)
 	cmd := exec.CommandContext(ctx, w.execPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

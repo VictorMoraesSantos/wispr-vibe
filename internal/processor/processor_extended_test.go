@@ -1,29 +1,27 @@
 package processor
 
 import (
+	"strings"
 	"testing"
 )
 
 func TestRemoveFillersPTBR(t *testing.T) {
-	// Note: Go's \b doesn't handle unicode word boundaries well.
-	// "né" won't be matched because é is not a \w char in Go regex.
-	// The fillerUm regex \bum\b also catches Portuguese article "um".
 	tests := []struct {
-		name     string
-		input    string
-		checkFn  func(string) bool
-		desc     string
+		name    string
+		input   string
+		checkFn func(string) bool
+		desc    string
 	}{
 		{
 			"removes tipo assim",
 			"tipo assim precisamos de algo",
-			func(s string) bool { return !containsWordFn(s, "tipo assim") },
+			func(s string) bool { return !strings.Contains(s, "tipo assim") },
 			"should remove 'tipo assim'",
 		},
 		{
 			"removes um (filler pattern)",
 			"uh um eu quero algo",
-			func(s string) bool { return !containsWordFn(s, "uh") && !containsWordFn(s, " um ") },
+			func(s string) bool { return !strings.Contains(s, "uh") && !strings.Contains(s, " um ") },
 			"should remove uh and um fillers",
 		},
 		{
@@ -42,19 +40,6 @@ func TestRemoveFillersPTBR(t *testing.T) {
 			}
 		})
 	}
-}
-
-func containsWordFn(s, word string) bool {
-	return len(s) >= len(word) && stringContains(s, word)
-}
-
-func stringContains(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }
 
 func TestRemoveFillersEN(t *testing.T) {
@@ -108,7 +93,7 @@ func TestCapitalizeFirstUnicode(t *testing.T) {
 		{"ação", "Ação"},
 		{"über", "Über"},
 		{"café", "Café"},
-		{"日本語", "日本語"}, // no uppercase for CJK — stays same
+		{"日本語", "日本語"},
 		{"a", "A"},
 	}
 
@@ -148,7 +133,6 @@ func TestEnsurePeriodVariousPunctuation(t *testing.T) {
 }
 
 func TestPipelineOrder(t *testing.T) {
-	// Verify pipeline processes in correct order
 	var order []int
 	f1 := func(s string) string { order = append(order, 1); return s + "A" }
 	f2 := func(s string) string { order = append(order, 2); return s + "B" }
