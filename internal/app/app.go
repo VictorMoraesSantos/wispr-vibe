@@ -40,7 +40,7 @@ func New(cfg *config.Config, log *slog.Logger) *App {
 
 func buildTranscriber(cfg *config.Config, log *slog.Logger) stt.Transcriber {
 	if cfg.STTEngine == "whisper_local" {
-		t, err := stt.NewWhisperLocal(cfg.WhisperExePath, cfg.WhisperModelPath)
+		t, err := stt.NewWhisperLocal(cfg.WhisperExePath, cfg.WhisperModelPath, cfg.UseGPU)
 		if err == nil {
 			return t
 		}

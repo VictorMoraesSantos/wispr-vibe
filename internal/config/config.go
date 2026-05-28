@@ -25,6 +25,7 @@ type Config struct {
 	RemoveFillers    bool   `json:"remove_fillers"`
 	FixPunctuation   bool   `json:"fix_punctuation"`
 	AutoPaste        bool   `json:"auto_paste"`
+	UseGPU           bool   `json:"use_gpu"`
 }
 
 func Default() *Config {
@@ -37,6 +38,7 @@ func Default() *Config {
 		Hotkey:         "Ctrl+Shift+R",
 		RemoveFillers:  true,
 		FixPunctuation: true,
+		UseGPU:         true,
 	}
 }
 

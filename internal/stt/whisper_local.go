@@ -15,9 +15,10 @@ import (
 type WhisperLocal struct {
 	execPath  string
 	modelPath string
+	useGPU    bool
 }
 
-func NewWhisperLocal(execPath, modelPath string) (*WhisperLocal, error) {
+func NewWhisperLocal(execPath, modelPath string, useGPU bool) (*WhisperLocal, error) {
 	if execPath == "" {
 		execPath = findWhisperExe()
 	}
@@ -32,7 +33,7 @@ func NewWhisperLocal(execPath, modelPath string) (*WhisperLocal, error) {
 		return nil, fmt.Errorf("whisper model not found")
 	}
 
-	return &WhisperLocal{execPath: execPath, modelPath: modelPath}, nil
+	return &WhisperLocal{execPath: execPath, modelPath: modelPath, useGPU: useGPU}, nil
 }
 
 func (w *WhisperLocal) Name() string { return "whisper_local" }
@@ -57,6 +58,10 @@ func (w *WhisperLocal) Transcribe(ctx context.Context, audio []byte, opts domain
 		"-f", tmpFile.Name(),
 		"--no-timestamps",
 		"--output-txt",
+	}
+
+	if !w.useGPU {
+		args = append(args, "-ng")
 	}
 
 	lang := opts.Language

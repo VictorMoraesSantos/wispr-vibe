@@ -252,7 +252,7 @@ func main() {
 
 func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyChanged func()) {
 	w := a.NewWindow("Settings")
-	w.Resize(fyne.NewSize(380, 340))
+	w.Resize(fyne.NewSize(380, 400))
 
 	engineText := cfg.STTEngine
 	if engineText == "whisper_local" {
@@ -267,6 +267,20 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 	hotkeyEntry := widget.NewEntry()
 	hotkeyEntry.SetText(currentHotkey)
 	hotkeyEntry.SetPlaceHolder("Ctrl+Shift+R, Alt+Z, Ctrl+F9...")
+
+	gpuCheck := widget.NewCheck("Use GPU acceleration (CUDA)", func(checked bool) {
+		cfg.UseGPU = checked
+		config.Save(cfg, "")
+	})
+	gpuCheck.SetChecked(cfg.UseGPU)
+
+	gpuHint := widget.NewLabelWithStyle(
+		"Requires CUDA-enabled whisper-cli. Restart after changing.",
+		fyne.TextAlignLeading,
+		fyne.TextStyle{Italic: true},
+	)
+	gpuHint.Importance = widget.LowImportance
+	gpuHint.Wrapping = fyne.TextWrapWord
 
 	saveStatus := widget.NewLabel("")
 
@@ -310,6 +324,13 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 		saveStatus,
 	)
 
+	gpuSection := container.NewVBox(
+		widget.NewLabelWithStyle("Performance", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		spacer(4),
+		gpuCheck,
+		gpuHint,
+	)
+
 	helpHint := widget.NewLabelWithStyle(
 		"Press once to start recording, again to transcribe.",
 		fyne.TextAlignLeading,
@@ -326,7 +347,11 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 		widget.NewSeparator(),
 		spacer(8),
 		hotkeySection,
-		spacer(10),
+		spacer(8),
+		widget.NewSeparator(),
+		spacer(8),
+		gpuSection,
+		spacer(8),
 		widget.NewSeparator(),
 		spacer(6),
 		helpHint,
