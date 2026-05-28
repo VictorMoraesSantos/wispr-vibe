@@ -128,33 +128,58 @@ func RunSetup(cfg *Config) error {
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 
-	// API Key
-	fmt.Println("Enter your OpenAI API key (starts with sk-):")
-	fmt.Print("→ ")
-	key, _ := reader.ReadString('\n')
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return fmt.Errorf("API key cannot be empty")
-	}
-	cfg.WhisperAPIKey = key
-
-	// Model selection
+	// API Provider
 	fmt.Println()
-	fmt.Println("Choose transcription model:")
-	fmt.Println("  [1] whisper-1       (fast, cheap, good for most cases)")
-	fmt.Println("  [2] gpt-4o-transcribe  (best accuracy, more expensive)")
-	fmt.Println("  [3] gpt-4o-mini-transcribe (good balance)")
-	fmt.Print("→ [1/2/3, default=1]: ")
-	modelChoice, _ := reader.ReadString('\n')
-	modelChoice = strings.TrimSpace(modelChoice)
+	fmt.Println("Choose your STT provider:")
+	fmt.Println("  [1] OpenAI   (whisper-1, gpt-4o-transcribe)")
+	fmt.Println("  [2] MiniMax  (hailuo)")
+	fmt.Print("→ [1/2, default=1]: ")
+	providerChoice, _ := reader.ReadString('\n')
+	providerChoice = strings.TrimSpace(providerChoice)
 
-	switch modelChoice {
+	switch providerChoice {
 	case "2":
-		cfg.WhisperModel = "gpt-4o-transcribe"
-	case "3":
-		cfg.WhisperModel = "gpt-4o-mini-transcribe"
+		cfg.WhisperAPIURL = "https://api.minimax.io/v1/audio/transcriptions"
+		cfg.WhisperModel = "hailuo"
+		fmt.Println()
+		fmt.Println("Enter your MiniMax API key:")
+		fmt.Print("→ ")
+		key, _ := reader.ReadString('\n')
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return fmt.Errorf("API key cannot be empty")
+		}
+		cfg.WhisperAPIKey = key
 	default:
-		cfg.WhisperModel = "whisper-1"
+		cfg.WhisperAPIURL = "https://api.openai.com/v1/audio/transcriptions"
+		fmt.Println()
+		fmt.Println("Enter your OpenAI API key (starts with sk-):")
+		fmt.Print("→ ")
+		key, _ := reader.ReadString('\n')
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return fmt.Errorf("API key cannot be empty")
+		}
+		cfg.WhisperAPIKey = key
+
+		// Model selection for OpenAI
+		fmt.Println()
+		fmt.Println("Choose transcription model:")
+		fmt.Println("  [1] whisper-1              (fast, cheap)")
+		fmt.Println("  [2] gpt-4o-transcribe      (best accuracy)")
+		fmt.Println("  [3] gpt-4o-mini-transcribe (good balance)")
+		fmt.Print("→ [1/2/3, default=1]: ")
+		modelChoice, _ := reader.ReadString('\n')
+		modelChoice = strings.TrimSpace(modelChoice)
+
+		switch modelChoice {
+		case "2":
+			cfg.WhisperModel = "gpt-4o-transcribe"
+		case "3":
+			cfg.WhisperModel = "gpt-4o-mini-transcribe"
+		default:
+			cfg.WhisperModel = "whisper-1"
+		}
 	}
 
 	// Language
