@@ -57,11 +57,17 @@ function Test-Command($cmd) {
     return [bool](Get-Command $cmd -ErrorAction SilentlyContinue)
 }
 
+# Write JSON without BOM so Go's json.Unmarshal can parse it
+function Write-JsonNoBOM($path, $obj) {
+    $json = $obj | ConvertTo-Json -Depth 3
+    [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
+}
+
 function Update-ConfigValue($file, $key, $value) {
     if (-not (Test-Path $file)) { return }
     $cfg = Get-Content $file -Raw | ConvertFrom-Json
     $cfg.$key = $value
-    $cfg | ConvertTo-Json -Depth 3 | Set-Content $file -Encoding UTF8
+    Write-JsonNoBOM $file $cfg
 }
 
 # --- Validate prerequisites ---
@@ -271,7 +277,7 @@ if (-not (Test-Path $configFile)) {
         fix_punctuation    = $true
         use_gpu            = $gpuEnabled
     }
-    $defaultConfig | ConvertTo-Json -Depth 2 | Set-Content $configFile -Encoding UTF8
+    $defaultConfig | ConvertTo-Json -Depth 2 | ForEach-Object { [IO.File]::WriteAllText($configFile, $_, [Text.UTF8Encoding]::new($false)) }
     Write-Host "  Config created: $configFile" -ForegroundColor Green
 } else {
     # Update the binary path and GPU flag in the existing config
@@ -281,7 +287,7 @@ if (-not (Test-Path $configFile)) {
     if ($finalModelPath -and (Test-Path $finalModelPath)) {
         $cfg.whisper_model_path = $finalModelPath
     }
-    $cfg | ConvertTo-Json -Depth 3 | Set-Content $configFile -Encoding UTF8
+    Write-JsonNoBOM $configFile $cfg
     Write-Host "  Config updated: whisper_exe_path, use_gpu, whisper_model_path" -ForegroundColor Green
 }
 

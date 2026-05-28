@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -76,6 +77,9 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, err
 	}
+
+	// Strip UTF-8 BOM if present (written by PowerShell Set-Content -Encoding UTF8)
+	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF})
 
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, err
