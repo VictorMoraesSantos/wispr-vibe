@@ -3,6 +3,10 @@ vibevoice
 vibevoice.exe
 *.exe
 
+# Build artifacts
+dist/
+deps/
+
 # IDE
 .idea/
 .vscode/

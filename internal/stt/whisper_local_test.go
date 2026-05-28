@@ -2,6 +2,7 @@ package stt
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -173,5 +174,53 @@ func TestBuildArgsModelAndAudioFile(t *testing.T) {
 	fIdx := slices.Index(args, "-f")
 	if fIdx == -1 || args[fIdx+1] != "my-audio.wav" {
 		t.Errorf("audio file not set correctly in args: %v", args)
+	}
+}
+
+func TestHasGPUSupportWithoutCudaDLL(t *testing.T) {
+	tmpDir := t.TempDir()
+	exe, _ := os.CreateTemp(tmpDir, "whisper*.exe")
+	exe.Close()
+
+	w := &WhisperLocal{execPath: exe.Name()}
+	if w.HasGPUSupport() {
+		t.Error("HasGPUSupport should be false when ggml-cuda.dll is absent")
+	}
+}
+
+func TestHasGPUSupportWithCudaDLL(t *testing.T) {
+	tmpDir := t.TempDir()
+	exe, _ := os.CreateTemp(tmpDir, "whisper*.exe")
+	exe.Close()
+
+	// Create a fake ggml-cuda.dll in the same directory
+	cudaDLL := filepath.Join(tmpDir, "ggml-cuda.dll")
+	if err := os.WriteFile(cudaDLL, []byte("fake"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	w := &WhisperLocal{execPath: exe.Name()}
+	if !w.HasGPUSupport() {
+		t.Error("HasGPUSupport should be true when ggml-cuda.dll is present")
+	}
+}
+
+func TestCheckGPUSupportWithCudaDLL(t *testing.T) {
+	tmpDir := t.TempDir()
+	exe, _ := os.CreateTemp(tmpDir, "whisper*.exe")
+	exe.Close()
+
+	// Without cuda DLL
+	if CheckGPUSupport(exe.Name()) {
+		t.Error("CheckGPUSupport should be false without ggml-cuda.dll")
+	}
+
+	// With cuda DLL
+	cudaDLL := filepath.Join(tmpDir, "ggml-cuda.dll")
+	if err := os.WriteFile(cudaDLL, []byte("fake"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !CheckGPUSupport(exe.Name()) {
+		t.Error("CheckGPUSupport should be true with ggml-cuda.dll present")
 	}
 }

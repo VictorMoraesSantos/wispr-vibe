@@ -39,16 +39,18 @@ func NewWhisperLocal(execPath, modelPath string, useGPU bool) (*WhisperLocal, er
 func (w *WhisperLocal) Name() string { return "whisper_local" }
 
 // HasGPUSupport reports whether this whisper-cli binary was compiled with CUDA.
-// It runs the binary with --help and looks for CUDA/GPU mentions in the output.
+// Detection is done by checking for ggml-cuda.dll next to the binary, which is
+// only present in CUDA-enabled builds. Parsing --help is unreliable because newer
+// whisper.cpp versions always include --no-gpu in help text even for CPU builds.
 func (w *WhisperLocal) HasGPUSupport() bool {
-	cmd := exec.Command(w.execPath, "--help")
-	out, _ := cmd.CombinedOutput()
-	lower := strings.ToLower(string(out))
-	return strings.Contains(lower, "cuda") || strings.Contains(lower, "gpu") || strings.Contains(lower, "ggml_cuda")
+	dir := filepath.Dir(w.execPath)
+	cudaDLL := filepath.Join(dir, "ggml-cuda.dll")
+	_, err := os.Stat(cudaDLL)
+	return err == nil
 }
 
 // CheckGPUSupport probes a whisper-cli binary for CUDA support without
-// constructing a full WhisperLocal. Returns false if the binary can't be run.
+// constructing a full WhisperLocal. Returns false if the binary is not found.
 func CheckGPUSupport(execPath string) bool {
 	if execPath == "" {
 		execPath = findWhisperExe()
@@ -130,32 +132,38 @@ func extractText(output string) string {
 }
 
 func findWhisperExe() string {
-	names := []string{"whisper-cli", "whisper-cli.exe", "whisper", "whisper.exe", "main.exe"}
-
-	for _, name := range names {
+	// 1. Check PATH first
+	for _, name := range []string{"whisper-cli", "whisper-cli.exe", "whisper", "whisper.exe"} {
 		if p, err := exec.LookPath(name); err == nil {
 			return p
 		}
 	}
 
+	// 2. Prefer the binary next to the running executable (standard install layout)
+	var appDirLocations []string
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		appDirLocations = []string{
+			filepath.Join(dir, "whisper-cli.exe"),
+			filepath.Join(dir, "whisper.exe"),
+		}
+	}
+	for _, p := range appDirLocations {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+
+	// 3. Legacy / fallback locations
 	home, _ := os.UserHomeDir()
 	locations := []string{
-		filepath.Join(home, ".wispr-vibe", "whisper-bin", "Release", "whisper-cli.exe"),
-		filepath.Join(home, ".wispr-vibe", "whisper-bin", "whisper-cli.exe"),
 		filepath.Join(home, ".wispr-vibe", "whisper-cli.exe"),
 		filepath.Join(home, ".wispr-vibe", "whisper.exe"),
+		filepath.Join(home, ".wispr-vibe", "whisper-bin", "Release", "whisper-cli.exe"),
+		filepath.Join(home, ".wispr-vibe", "whisper-bin", "whisper-cli.exe"),
 		`C:\whisper\whisper-cli.exe`,
 		`C:\whisper.cpp\build\bin\Release\whisper-cli.exe`,
 	}
-
-	if exe, err := os.Executable(); err == nil {
-		dir := filepath.Dir(exe)
-		locations = append(locations,
-			filepath.Join(dir, "whisper-cli.exe"),
-			filepath.Join(dir, "whisper.exe"),
-		)
-	}
-
 	for _, p := range locations {
 		if _, err := os.Stat(p); err == nil {
 			return p
