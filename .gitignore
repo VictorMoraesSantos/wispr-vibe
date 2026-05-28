@@ -1,0 +1,19 @@
+# Binaries
+vibevoice
+vibevoice.exe
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Config with secrets
+config.json
