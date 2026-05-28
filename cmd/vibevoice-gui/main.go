@@ -18,6 +18,7 @@ import (
 	"github.com/victorlui/wispr-vibe/internal/config"
 	"github.com/victorlui/wispr-vibe/internal/hotkey"
 	"github.com/victorlui/wispr-vibe/internal/logger"
+	"github.com/victorlui/wispr-vibe/internal/toast"
 )
 
 func main() {
@@ -39,6 +40,9 @@ func main() {
 
 	application := app.New(cfg, log)
 	ctx := context.Background()
+
+	// Create native toast overlay (bottom of screen, always on top)
+	toastOverlay := toast.New()
 
 	// --- Fyne GUI ---
 	a := fyneApp.NewWithID("com.wispr-vibe.app")
@@ -87,17 +91,22 @@ func main() {
 				statusLabel.SetText(fmt.Sprintf("🎙 Recording... (%s to stop)", hotkeyCombo))
 				resultLabel.SetText("")
 
+				// Show toast overlay at bottom of screen
+				toastOverlay.Show("🎙 Recording...")
+
 				timerDone = make(chan struct{})
 				go func() {
-					ticker := time.NewTicker(500 * time.Millisecond)
+					ticker := time.NewTicker(time.Second)
 					defer ticker.Stop()
 					for {
 						select {
 						case <-timerDone:
 							return
 						case <-ticker.C:
-							elapsed := time.Since(recordStart).Truncate(time.Second)
+							secs := int(time.Since(recordStart).Seconds())
+							toastOverlay.SetText(toast.FormatRecordingText(secs))
 							fyne.Do(func() {
+								elapsed := time.Since(recordStart).Truncate(time.Second)
 								timerLabel.SetText(fmt.Sprintf("⏱ %s", elapsed))
 							})
 						}
@@ -110,14 +119,20 @@ func main() {
 				recordBtn.Disable()
 				statusLabel.SetText("⏳ Processing audio...")
 
+				// Update toast to show processing
+				toastOverlay.SetText("⏳ Transcribing...")
+
 				go func() {
-					// Hide window so previous app regains focus for paste
+					// Hide main window so previous app regains focus for paste
 					fyne.Do(func() {
 						w.Hide()
 					})
 					time.Sleep(300 * time.Millisecond)
 
 					text, err := application.StopAndProcess(ctx)
+
+					// Hide toast
+					toastOverlay.Hide()
 
 					fyne.Do(func() {
 						if err != nil {
@@ -215,6 +230,7 @@ func main() {
 				if hk != nil {
 					hk.Unregister()
 				}
+				toastOverlay.Destroy()
 				a.Quit()
 			}),
 		))
@@ -226,6 +242,7 @@ func main() {
 	if hk != nil {
 		hk.Unregister()
 	}
+	toastOverlay.Destroy()
 }
 
 func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyChanged func()) {
