@@ -47,7 +47,7 @@ func main() {
 	a.Settings().SetTheme(newVibeTheme())
 
 	w := a.NewWindow("Wispr Vibe")
-	w.Resize(fyne.NewSize(380, 340))
+	w.Resize(fyne.NewSize(360, 320))
 	w.CenterOnScreen()
 
 	hotkeyCombo := cfg.Hotkey
@@ -55,17 +55,18 @@ func main() {
 		hotkeyCombo = "Ctrl+Shift+R"
 	}
 
-	statusIndicator := canvas.NewCircle(colorReady)
-	statusIndicator.Resize(fyne.NewSize(10, 10))
+	statusDot := canvas.NewCircle(colorReady)
+	statusDotContainer := container.New(&fixedSizeLayout{size: fyne.NewSize(12, 12)}, statusDot)
 
 	statusLabel := widget.NewLabelWithStyle(
-		fmt.Sprintf("Ready  ·  %s", hotkeyCombo),
-		fyne.TextAlignCenter,
+		"Ready",
+		fyne.TextAlignLeading,
 		fyne.TextStyle{Bold: true},
 	)
 
 	resultLabel := widget.NewLabel("")
 	resultLabel.Wrapping = fyne.TextWrapWord
+	resultLabel.Importance = widget.LowImportance
 
 	timerLabel := widget.NewLabelWithStyle("", fyne.TextAlignCenter, fyne.TextStyle{Monospace: true})
 
@@ -81,16 +82,16 @@ func main() {
 			if !recording {
 				if err := application.StartRecording(); err != nil {
 					statusLabel.SetText(fmt.Sprintf("Error: %v", err))
-					statusIndicator.FillColor = colorError
-					statusIndicator.Refresh()
+					statusDot.FillColor = colorError
+					statusDot.Refresh()
 					return
 				}
 				recording = true
 				recordStart = time.Now()
-				recordBtn.SetText("Stop & Transcribe")
-				statusLabel.SetText(fmt.Sprintf("Recording  ·  %s to stop", hotkeyCombo))
-				statusIndicator.FillColor = colorRecording
-				statusIndicator.Refresh()
+				recordBtn.SetText("Stop")
+				statusLabel.SetText("Recording")
+				statusDot.FillColor = colorRecording
+				statusDot.Refresh()
 				resultLabel.SetText("")
 
 				toastOverlay.Show("Recording...")
@@ -108,7 +109,9 @@ func main() {
 							toastOverlay.SetText(toast.FormatRecordingText(secs))
 							fyne.Do(func() {
 								elapsed := time.Since(recordStart).Truncate(time.Second)
-								timerLabel.SetText(elapsed.String())
+								m := int(elapsed.Minutes())
+								s := int(elapsed.Seconds()) % 60
+								timerLabel.SetText(fmt.Sprintf("%d:%02d", m, s))
 							})
 						}
 					}
@@ -118,10 +121,10 @@ func main() {
 				close(timerDone)
 				recordBtn.SetText("Transcribing...")
 				recordBtn.Disable()
-				statusLabel.SetText("Processing audio...")
-				statusIndicator.FillColor = colorProcessing
-				statusIndicator.Refresh()
-				toastOverlay.SetText("Transcribing...")
+				statusLabel.SetText("Processing")
+				statusDot.FillColor = colorProcessing
+				statusDot.Refresh()
+				toastOverlay.SetProcessing("Transcribing...")
 
 				go func() {
 					fyne.Do(func() { w.Hide() })
@@ -133,13 +136,13 @@ func main() {
 					fyne.Do(func() {
 						if err != nil {
 							statusLabel.SetText(fmt.Sprintf("Error: %v", err))
-							statusIndicator.FillColor = colorError
+							statusDot.FillColor = colorError
 						} else {
-							statusLabel.SetText("Done  ·  text inserted at cursor")
-							statusIndicator.FillColor = colorSuccess
+							statusLabel.SetText("Text inserted at cursor")
+							statusDot.FillColor = colorSuccess
 							resultLabel.SetText(text)
 						}
-						statusIndicator.Refresh()
+						statusDot.Refresh()
 						recordBtn.SetText("Record")
 						recordBtn.Enable()
 						timerLabel.SetText("")
@@ -177,45 +180,50 @@ func main() {
 	})
 
 	titleLabel := widget.NewLabelWithStyle("Wispr Vibe", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	versionLabel := widget.NewLabelWithStyle("v1.0", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
-	versionLabel.Importance = widget.LowImportance
 
 	header := container.NewHBox(
 		titleLabel,
-		versionLabel,
 		layout.NewSpacer(),
 		minimizeBtn,
 		settingsBtn,
 	)
 
 	statusRow := container.NewHBox(
-		layout.NewSpacer(),
-		container.NewPadded(statusIndicator),
+		statusDotContainer,
 		statusLabel,
-		layout.NewSpacer(),
 	)
 
-	hotkeyHint := widget.NewLabelWithStyle(
-		fmt.Sprintf("%s from any app", hotkeyCombo),
+	hotkeyBadge := widget.NewLabelWithStyle(
+		hotkeyCombo,
 		fyne.TextAlignCenter,
-		fyne.TextStyle{Italic: true},
+		fyne.TextStyle{Monospace: true},
 	)
-	hotkeyHint.Importance = widget.LowImportance
+	hotkeyBadge.Importance = widget.LowImportance
+
+	centerSection := container.NewVBox(
+		container.NewCenter(timerLabel),
+		spacer(6),
+		container.NewCenter(recordBtn),
+		spacer(4),
+		container.NewCenter(hotkeyBadge),
+	)
+
+	resultPanel := container.NewVBox(
+		resultLabel,
+	)
 
 	content := container.NewVBox(
 		header,
 		widget.NewSeparator(),
-		spacer(12),
-		statusRow,
-		container.NewCenter(timerLabel),
-		spacer(8),
-		layout.NewSpacer(),
-		container.NewCenter(recordBtn),
+		spacer(10),
+		container.NewPadded(statusRow),
 		spacer(4),
-		container.NewCenter(hotkeyHint),
 		layout.NewSpacer(),
+		centerSection,
+		layout.NewSpacer(),
+		spacer(4),
 		widget.NewSeparator(),
-		resultLabel,
+		resultPanel,
 	)
 
 	w.SetContent(container.NewPadded(content))
@@ -244,7 +252,7 @@ func main() {
 
 func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyChanged func()) {
 	w := a.NewWindow("Settings")
-	w.Resize(fyne.NewSize(400, 380))
+	w.Resize(fyne.NewSize(380, 340))
 
 	engineText := cfg.STTEngine
 	if engineText == "whisper_local" {
@@ -287,37 +295,40 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 	})
 	saveBtn.Importance = widget.HighImportance
 
-	engineSection := container.NewVBox(
-		widget.NewLabelWithStyle("Speech Engine", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabel(fmt.Sprintf("Engine:    %s", engineText)),
-		widget.NewLabel(fmt.Sprintf("Provider:  %s", orDefault(cfg.Provider, "local"))),
-		widget.NewLabel(fmt.Sprintf("Language:  %s", orDefault(cfg.Language, "auto-detect"))),
+	engineForm := widget.NewForm(
+		widget.NewFormItem("Engine", widget.NewLabel(engineText)),
+		widget.NewFormItem("Provider", widget.NewLabel(orDefault(cfg.Provider, "local"))),
+		widget.NewFormItem("Language", widget.NewLabel(orDefault(cfg.Language, "auto-detect"))),
 	)
 
 	hotkeySection := container.NewVBox(
-		widget.NewLabelWithStyle("Push-to-Talk Hotkey", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Hotkey", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		spacer(4),
 		hotkeyEntry,
+		spacer(4),
 		saveBtn,
 		saveStatus,
 	)
 
 	helpHint := widget.NewLabelWithStyle(
-		"Press hotkey once to start, again to stop and transcribe.",
-		fyne.TextAlignCenter,
+		"Press once to start recording, again to transcribe.",
+		fyne.TextAlignLeading,
 		fyne.TextStyle{Italic: true},
 	)
 	helpHint.Importance = widget.LowImportance
 	helpHint.Wrapping = fyne.TextWrapWord
 
 	info := container.NewVBox(
-		engineSection,
-		spacer(8),
+		widget.NewLabelWithStyle("Engine", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		spacer(2),
+		engineForm,
+		spacer(6),
 		widget.NewSeparator(),
 		spacer(8),
 		hotkeySection,
-		spacer(12),
+		spacer(10),
 		widget.NewSeparator(),
-		spacer(4),
+		spacer(6),
 		helpHint,
 	)
 
@@ -330,6 +341,21 @@ func spacer(height float32) fyne.CanvasObject {
 	s := canvas.NewRectangle(colorTransparent)
 	s.SetMinSize(fyne.NewSize(0, height))
 	return s
+}
+
+type fixedSizeLayout struct {
+	size fyne.Size
+}
+
+func (f *fixedSizeLayout) MinSize(_ []fyne.CanvasObject) fyne.Size {
+	return f.size
+}
+
+func (f *fixedSizeLayout) Layout(objects []fyne.CanvasObject, _ fyne.Size) {
+	for _, o := range objects {
+		o.Resize(f.size)
+		o.Move(fyne.NewPos(0, 0))
+	}
 }
 
 func orDefault(s, def string) string {

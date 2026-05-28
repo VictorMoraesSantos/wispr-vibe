@@ -131,7 +131,15 @@ type Toast struct {
 	mu      sync.Mutex
 	text    string
 	visible bool
+	state   toastState
 }
+
+type toastState int
+
+const (
+	stateRecording    toastState = iota
+	stateTranscribing
+)
 
 var globalToast *Toast
 
@@ -167,24 +175,36 @@ func (t *Toast) paint(hwnd uintptr) {
 	}
 	defer endPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
 
-	bgColor := rgb(20, 20, 24)
+	bgColor := rgb(18, 18, 23)
 	brush, _, _ := createSolidBrush.Call(uintptr(bgColor))
-	borderColor := rgb(55, 55, 65)
+	borderColor := rgb(44, 42, 54)
 	pen, _, _ := createPen.Call(0, 1, uintptr(borderColor))
 	oldBrush, _, _ := selectObject.Call(hdc, brush)
 	oldPen, _, _ := selectObject.Call(hdc, pen)
 
 	r := rect{0, 0, toastWidth, toastHeight}
-	roundRect.Call(hdc, 0, 0, uintptr(r.right), uintptr(r.bottom), 24, 24)
+	roundRect.Call(hdc, 0, 0, uintptr(r.right), uintptr(r.bottom), 20, 20)
 
 	selectObject.Call(hdc, oldBrush)
 	selectObject.Call(hdc, oldPen)
 	deleteObject.Call(brush)
 	deleteObject.Call(pen)
 
-	// Recording indicator dot
-	dotBrush, _, _ := createSolidBrush.Call(uintptr(rgb(239, 68, 68)))
-	dotPen, _, _ := createPen.Call(0, 1, uintptr(rgb(239, 68, 68)))
+	t.mu.Lock()
+	currentState := t.state
+	txt := t.text
+	t.mu.Unlock()
+
+	// State-aware indicator dot
+	var dotColor uint32
+	if currentState == stateTranscribing {
+		dotColor = rgb(129, 110, 240) // violet
+	} else {
+		dotColor = rgb(240, 75, 75) // warm red
+	}
+
+	dotBrush, _, _ := createSolidBrush.Call(uintptr(dotColor))
+	dotPen, _, _ := createPen.Call(0, 1, uintptr(dotColor))
 	oldBrush2, _, _ := selectObject.Call(hdc, dotBrush)
 	oldPen2, _, _ := selectObject.Call(hdc, dotPen)
 	const dotSize = 8
@@ -197,18 +217,14 @@ func (t *Toast) paint(hwnd uintptr) {
 	deleteObject.Call(dotPen)
 
 	var lf logFont
-	lf.height = -14
+	lf.height = -13
 	lf.weight = 500
 	copy(lf.faceName[:], utf16("Segoe UI"))
 	font, _, _ := createFontIndirect.Call(uintptr(unsafe.Pointer(&lf)))
 	oldFont, _, _ := selectObject.Call(hdc, font)
 
 	setBkMode.Call(hdc, transparent)
-	setTextColor.Call(hdc, uintptr(rgb(220, 220, 228)))
-
-	t.mu.Lock()
-	txt := t.text
-	t.mu.Unlock()
+	setTextColor.Call(hdc, uintptr(rgb(210, 208, 218)))
 
 	textRect := rect{dotX + dotSize + 10, 0, toastWidth - 16, toastHeight}
 	txtPtr, _ := syscall.UTF16PtrFromString(txt)
@@ -225,7 +241,7 @@ const (
 )
 
 func New() *Toast {
-	t := &Toast{text: "🎙 Recording..."}
+	t := &Toast{text: "Recording...", state: stateRecording}
 	globalToast = t
 
 	ready := make(chan struct{})
@@ -289,6 +305,7 @@ func (t *Toast) Show(text string) {
 	t.mu.Lock()
 	t.text = text
 	t.visible = true
+	t.state = stateRecording
 	t.mu.Unlock()
 
 	if t.hwnd != 0 {
@@ -310,6 +327,17 @@ func (t *Toast) Hide() {
 func (t *Toast) SetText(text string) {
 	t.mu.Lock()
 	t.text = text
+	t.mu.Unlock()
+
+	if t.hwnd != 0 {
+		postMessage.Call(t.hwnd, wmUpdateText, 0, 0)
+	}
+}
+
+func (t *Toast) SetProcessing(text string) {
+	t.mu.Lock()
+	t.text = text
+	t.state = stateTranscribing
 	t.mu.Unlock()
 
 	if t.hwnd != 0 {

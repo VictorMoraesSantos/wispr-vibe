@@ -16,33 +16,35 @@ func newVibeTheme() fyne.Theme {
 func (v *vibeTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	switch name {
 	case theme.ColorNameBackground:
-		return color.NRGBA{R: 22, G: 22, B: 26, A: 255}
+		return color.NRGBA{R: 20, G: 20, B: 25, A: 255}
 	case theme.ColorNameForeground:
-		return color.NRGBA{R: 225, G: 225, B: 230, A: 255}
+		return color.NRGBA{R: 222, G: 220, B: 228, A: 255}
 	case theme.ColorNameButton:
-		return color.NRGBA{R: 38, G: 38, B: 44, A: 255}
+		return color.NRGBA{R: 34, G: 34, B: 40, A: 255}
 	case theme.ColorNameDisabledButton:
-		return color.NRGBA{R: 32, G: 32, B: 36, A: 255}
+		return color.NRGBA{R: 28, G: 28, B: 33, A: 255}
 	case theme.ColorNameDisabled:
-		return color.NRGBA{R: 90, G: 90, B: 100, A: 255}
+		return color.NRGBA{R: 82, G: 80, B: 92, A: 255}
 	case theme.ColorNamePrimary:
-		return color.NRGBA{R: 99, G: 102, B: 241, A: 255} // indigo accent
+		return color.NRGBA{R: 129, G: 110, B: 240, A: 255} // warm violet
 	case theme.ColorNameFocus:
-		return color.NRGBA{R: 99, G: 102, B: 241, A: 80}
+		return color.NRGBA{R: 129, G: 110, B: 240, A: 70}
 	case theme.ColorNameHover:
-		return color.NRGBA{R: 50, G: 50, B: 58, A: 255}
+		return color.NRGBA{R: 44, G: 42, B: 52, A: 255}
 	case theme.ColorNameInputBackground:
-		return color.NRGBA{R: 30, G: 30, B: 35, A: 255}
+		return color.NRGBA{R: 26, G: 26, B: 32, A: 255}
 	case theme.ColorNameInputBorder:
-		return color.NRGBA{R: 55, G: 55, B: 65, A: 255}
+		return color.NRGBA{R: 50, G: 48, B: 60, A: 255}
 	case theme.ColorNamePlaceHolder:
-		return color.NRGBA{R: 110, G: 110, B: 125, A: 255}
+		return color.NRGBA{R: 100, G: 98, B: 112, A: 255}
 	case theme.ColorNameSeparator:
-		return color.NRGBA{R: 42, G: 42, B: 48, A: 255}
+		return color.NRGBA{R: 38, G: 36, B: 44, A: 255}
 	case theme.ColorNameOverlayBackground:
-		return color.NRGBA{R: 18, G: 18, B: 22, A: 240}
+		return color.NRGBA{R: 16, G: 16, B: 20, A: 245}
 	case theme.ColorNameHeaderBackground:
-		return color.NRGBA{R: 26, G: 26, B: 30, A: 255}
+		return color.NRGBA{R: 24, G: 24, B: 29, A: 255}
+	case theme.ColorNameScrollBar:
+		return color.NRGBA{R: 60, G: 58, B: 70, A: 180}
 	default:
 		return theme.DarkTheme().Color(name, variant)
 	}
@@ -61,19 +63,19 @@ func (v *vibeTheme) Size(name fyne.ThemeSizeName) float32 {
 	case theme.SizeNamePadding:
 		return 6
 	case theme.SizeNameInnerPadding:
-		return 10
+		return 12
 	case theme.SizeNameText:
-		return 14
+		return 13
 	case theme.SizeNameHeadingText:
-		return 18
+		return 17
 	case theme.SizeNameSubHeadingText:
-		return 15
+		return 14
 	case theme.SizeNameSeparatorThickness:
 		return 1
 	case theme.SizeNameInputBorder:
 		return 1
 	case theme.SizeNameInputRadius:
-		return 6
+		return 8
 	default:
 		return theme.DarkTheme().Size(name)
 	}
