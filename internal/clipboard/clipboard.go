@@ -9,7 +9,6 @@ import (
 	"strings"
 )
 
-// Copy places text on the system clipboard.
 func Copy(text string) error {
 	switch runtime.GOOS {
 	case "darwin":
@@ -24,7 +23,6 @@ func Copy(text string) error {
 	}
 }
 
-// Paste simulates Ctrl+V to paste clipboard content.
 func Paste() error {
 	switch runtime.GOOS {
 	case "darwin":
@@ -39,7 +37,6 @@ func Paste() error {
 	}
 }
 
-// TypeText copies text and pastes into active window.
 func TypeText(text string) error {
 	if err := Copy(text); err != nil {
 		return err
@@ -47,12 +44,10 @@ func TypeText(text string) error {
 	return Paste()
 }
 
-// CopyToClipboard is an alias for Copy on non-Windows.
 func CopyToClipboard(text string) error {
 	return Copy(text)
 }
 
-// PasteToActiveWindow is an alias for Paste on non-Windows.
 func PasteToActiveWindow() error {
 	return Paste()
 }

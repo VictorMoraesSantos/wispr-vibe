@@ -126,7 +126,6 @@ type logFont struct {
 	faceName       [32]uint16
 }
 
-// Toast is a floating overlay window for recording status.
 type Toast struct {
 	hwnd    uintptr
 	mu      sync.Mutex
@@ -168,7 +167,6 @@ func (t *Toast) paint(hwnd uintptr) {
 	}
 	defer endPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
 
-	// Background: dark rounded rectangle
 	bgColor := rgb(30, 30, 30)
 	brush, _, _ := createSolidBrush.Call(uintptr(bgColor))
 	pen, _, _ := createPen.Call(0, 1, uintptr(rgb(80, 80, 80)))
@@ -183,7 +181,6 @@ func (t *Toast) paint(hwnd uintptr) {
 	deleteObject.Call(brush)
 	deleteObject.Call(pen)
 
-	// Font
 	var lf logFont
 	lf.height = -16
 	lf.weight = 400
@@ -191,7 +188,6 @@ func (t *Toast) paint(hwnd uintptr) {
 	font, _, _ := createFontIndirect.Call(uintptr(unsafe.Pointer(&lf)))
 	oldFont, _, _ := selectObject.Call(hdc, font)
 
-	// Text
 	setBkMode.Call(hdc, transparent)
 	setTextColor.Call(hdc, uintptr(rgb(255, 255, 255)))
 
@@ -212,11 +208,8 @@ const (
 	toastHeight = 44
 )
 
-// New creates and starts the toast overlay (hidden initially).
 func New() *Toast {
-	t := &Toast{
-		text: "🎙 Recording...",
-	}
+	t := &Toast{text: "🎙 Recording..."}
 	globalToast = t
 
 	ready := make(chan struct{})
@@ -232,7 +225,6 @@ func (t *Toast) run(ready chan struct{}) {
 	hInstance, _, _ := getModuleHandle.Call(0)
 	className, _ := syscall.UTF16PtrFromString("WisprVibe_Toast")
 
-	// Register window class
 	wc := wndClassEx{
 		size:      uint32(unsafe.Sizeof(wndClassEx{})),
 		style:     csHredraw | csVredraw,
@@ -242,14 +234,12 @@ func (t *Toast) run(ready chan struct{}) {
 	}
 	registerClassEx.Call(uintptr(unsafe.Pointer(&wc)))
 
-	// Get screen size for positioning at bottom-center
 	screenW, _, _ := getSystemMetrics.Call(smCxScreen)
 	screenH, _, _ := getSystemMetrics.Call(smCyScreen)
 
 	x := (int(screenW) - toastWidth) / 2
-	y := int(screenH) - toastHeight - 60 // 60px from bottom
+	y := int(screenH) - toastHeight - 60
 
-	// Create popup window: topmost, no-activate, layered, tool window
 	hwnd, _, _ := createWindowEx.Call(
 		wsExTopmost|wsExToolwindow|wsExLayered|wsExNoactivate,
 		uintptr(unsafe.Pointer(className)),
@@ -265,13 +255,9 @@ func (t *Toast) run(ready chan struct{}) {
 	}
 
 	t.hwnd = hwnd
-
-	// Set opacity (220/255 ≈ 86%)
 	setLayeredWindowAttributes.Call(hwnd, 0, 220, lwaAlpha)
-
 	close(ready)
 
-	// Message loop
 	var m msg
 	for {
 		ret, _, _ := getMessage.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
@@ -283,7 +269,6 @@ func (t *Toast) run(ready chan struct{}) {
 	}
 }
 
-// Show makes the toast visible with the given text.
 func (t *Toast) Show(text string) {
 	t.mu.Lock()
 	t.text = text
@@ -296,7 +281,6 @@ func (t *Toast) Show(text string) {
 	}
 }
 
-// Hide hides the toast.
 func (t *Toast) Hide() {
 	t.mu.Lock()
 	t.visible = false
@@ -307,7 +291,6 @@ func (t *Toast) Hide() {
 	}
 }
 
-// SetText updates the toast text without changing visibility.
 func (t *Toast) SetText(text string) {
 	t.mu.Lock()
 	t.text = text
@@ -318,7 +301,6 @@ func (t *Toast) SetText(text string) {
 	}
 }
 
-// Destroy cleans up the toast window.
 func (t *Toast) Destroy() {
 	if t.hwnd != 0 {
 		destroyWindow.Call(t.hwnd)
@@ -334,7 +316,6 @@ func utf16(s string) []uint16 {
 	return r
 }
 
-// FormatRecordingText returns the display text for recording state.
 func FormatRecordingText(seconds int) string {
 	return fmt.Sprintf("🎙 Recording... %ds", seconds)
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/victorlui/wispr-vibe/pkg/domain"
 )
 
-// WhisperAPI implements Transcriber using OpenAI-compatible Whisper API.
 type WhisperAPI struct {
 	apiKey string
 	apiURL string
@@ -36,9 +35,7 @@ func NewWhisperAPI(apiKey, apiURL, model string) *WhisperAPI {
 	}
 }
 
-func (w *WhisperAPI) Name() string {
-	return "whisper_api"
-}
+func (w *WhisperAPI) Name() string { return "whisper_api" }
 
 func (w *WhisperAPI) Transcribe(ctx context.Context, audio []byte, opts domain.TranscribeOpts) (*domain.TranscribeResult, error) {
 	start := time.Now()

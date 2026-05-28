@@ -4,14 +4,13 @@ package toast
 
 import "fmt"
 
-// Toast is a no-op on non-Windows platforms.
 type Toast struct{}
 
-func New() *Toast            { return &Toast{} }
-func (t *Toast) Show(text string) {}
-func (t *Toast) Hide()       {}
+func New() *Toast                  { return &Toast{} }
+func (t *Toast) Show(text string)  {}
+func (t *Toast) Hide()             {}
 func (t *Toast) SetText(text string) {}
-func (t *Toast) Destroy()    {}
+func (t *Toast) Destroy()          {}
 
 func FormatRecordingText(seconds int) string {
 	return fmt.Sprintf("🎙 Recording... %ds", seconds)

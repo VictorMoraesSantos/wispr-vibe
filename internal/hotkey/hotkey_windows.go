@@ -37,7 +37,6 @@ type msg struct {
 	pt      struct{ x, y int32 }
 }
 
-// Listener listens for a registered global hotkey.
 type Listener struct {
 	id       int32
 	threadID uint32
@@ -45,8 +44,6 @@ type Listener struct {
 	callback func()
 }
 
-// Register registers a global hotkey and calls callback when triggered.
-// Both RegisterHotKey and GetMessage run on the SAME locked OS thread.
 func Register(id int32, modifiers uint32, vk uint32, callback func()) (*Listener, error) {
 	l := &Listener{
 		id:       id,
@@ -57,15 +54,12 @@ func Register(id int32, modifiers uint32, vk uint32, callback func()) (*Listener
 	errCh := make(chan error, 1)
 
 	go func() {
-		// Lock this goroutine to a single OS thread — critical for Win32 message loop
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 
-		// Get thread ID for PostThreadMessage on unregister
 		tid, _, _ := getCurrentTID.Call()
 		l.threadID = uint32(tid)
 
-		// Register hotkey on THIS thread
 		ret, _, err := registerHotKey.Call(0, uintptr(id), uintptr(modifiers), uintptr(vk))
 		if ret == 0 {
 			errCh <- fmt.Errorf("RegisterHotKey failed: %w", err)
@@ -73,13 +67,9 @@ func Register(id int32, modifiers uint32, vk uint32, callback func()) (*Listener
 		}
 		errCh <- nil
 
-		// Message loop on same thread — receives WM_HOTKEY
 		var m msg
 		for {
-			ret, _, _ := getMessage.Call(
-				uintptr(unsafe.Pointer(&m)),
-				0, 0, 0,
-			)
+			ret, _, _ := getMessage.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
 			if ret == 0 || ret == uintptr(^uintptr(0)) {
 				break
 			}
@@ -100,7 +90,6 @@ func Register(id int32, modifiers uint32, vk uint32, callback func()) (*Listener
 	return l, nil
 }
 
-// RegisterFromString parses a hotkey string like "Ctrl+Shift+R" and registers it.
 func RegisterFromString(id int32, combo string, callback func()) (*Listener, error) {
 	mods, vk, err := ParseHotkey(combo)
 	if err != nil {
@@ -109,15 +98,12 @@ func RegisterFromString(id int32, combo string, callback func()) (*Listener, err
 	return Register(id, mods, vk, callback)
 }
 
-// Unregister removes the hotkey and stops the listener.
 func (l *Listener) Unregister() {
-	// Post WM_QUIT to the listener thread to break the message loop
 	if l.threadID != 0 {
 		postThreadMsg.Call(uintptr(l.threadID), wmQuit, 0, 0)
 	}
 }
 
-// ParseHotkey parses "Ctrl+Shift+R" → (modifiers, virtualKey, error)
 func ParseHotkey(combo string) (uint32, uint32, error) {
 	parts := strings.Split(strings.TrimSpace(combo), "+")
 	if len(parts) == 0 {
@@ -155,7 +141,6 @@ func ParseHotkey(combo string) (uint32, uint32, error) {
 	return mods, vk, nil
 }
 
-// FormatHotkey converts modifiers + VK back to display string.
 func FormatHotkey(mods uint32, vk uint32) string {
 	var parts []string
 	if mods&ModControl != 0 {
@@ -174,21 +159,17 @@ func FormatHotkey(mods uint32, vk uint32) string {
 	return strings.Join(parts, "+")
 }
 
-// keyNameToVK maps key names to Windows virtual key codes.
 func keyNameToVK(name string) (uint32, bool) {
 	upper := strings.ToUpper(strings.TrimSpace(name))
 
-	// Single letter A-Z
 	if len(upper) == 1 && upper[0] >= 'A' && upper[0] <= 'Z' {
 		return uint32(upper[0]), true
 	}
 
-	// Single digit 0-9
 	if len(upper) == 1 && upper[0] >= '0' && upper[0] <= '9' {
 		return uint32(upper[0]), true
 	}
 
-	// Function keys and special keys
 	special := map[string]uint32{
 		"F1": 0x70, "F2": 0x71, "F3": 0x72, "F4": 0x73,
 		"F5": 0x74, "F6": 0x75, "F7": 0x76, "F8": 0x77,
@@ -219,7 +200,6 @@ func keyNameToVK(name string) (uint32, bool) {
 	return 0, false
 }
 
-// vkToKeyName converts VK code back to display name.
 func vkToKeyName(vk uint32) string {
 	if vk >= 'A' && vk <= 'Z' {
 		return string(rune(vk))

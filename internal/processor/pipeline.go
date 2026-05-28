@@ -1,9 +1,7 @@
 package processor
 
-// Filter is a single text transformation step.
 type Filter func(string) string
 
-// Pipeline chains multiple filters in order.
 type Pipeline struct {
 	filters []Filter
 }
@@ -23,7 +21,6 @@ func (p *Pipeline) Add(f Filter) {
 	p.filters = append(p.filters, f)
 }
 
-// DefaultPipeline returns pipeline with standard cleanup filters.
 func DefaultPipeline() *Pipeline {
 	return NewPipeline(
 		RemoveFillers,

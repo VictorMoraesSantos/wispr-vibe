@@ -8,15 +8,14 @@ import (
 	"sync"
 )
 
-// Recorder captures audio from the default input device using ffmpeg.
 type Recorder struct {
-	sampleRate  int
-	ffmpegPath  string
-	cmd         *exec.Cmd
-	buf         bytes.Buffer
-	mu          sync.Mutex
-	recording   bool
-	done        chan struct{}
+	sampleRate int
+	ffmpegPath string
+	cmd        *exec.Cmd
+	buf        bytes.Buffer
+	mu         sync.Mutex
+	recording  bool
+	done       chan struct{}
 }
 
 func NewRecorder(sampleRate int) *Recorder {
@@ -70,8 +69,6 @@ func (r *Recorder) Stop() ([]byte, error) {
 
 	r.recording = false
 
-	// Send quit signal to ffmpeg (write 'q' to stdin won't work without stdin pipe)
-	// Kill the process gracefully
 	if r.cmd != nil && r.cmd.Process != nil {
 		r.cmd.Process.Kill()
 	}
@@ -95,8 +92,7 @@ func (r *Recorder) IsRecording() bool {
 func encodeWAV(samples []int16, sampleRate int) ([]byte, error) {
 	var buf bytes.Buffer
 
-	numSamples := len(samples)
-	dataSize := numSamples * 2
+	dataSize := len(samples) * 2
 	fileSize := 36 + dataSize
 
 	buf.WriteString("RIFF")
@@ -112,6 +108,7 @@ func encodeWAV(samples []int16, sampleRate int) ([]byte, error) {
 	binary.Write(&buf, binary.LittleEndian, int16(16))
 	buf.WriteString("data")
 	binary.Write(&buf, binary.LittleEndian, int32(dataSize))
+
 	for _, s := range samples {
 		binary.Write(&buf, binary.LittleEndian, s)
 	}

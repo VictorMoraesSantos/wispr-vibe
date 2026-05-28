@@ -24,7 +24,7 @@ import (
 func main() {
 	cfg, err := config.Load("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "config load: %v\n", err)
+		fmt.Fprintf(os.Stderr, "config: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -40,11 +40,8 @@ func main() {
 
 	application := app.New(cfg, log)
 	ctx := context.Background()
-
-	// Create native toast overlay (bottom of screen, always on top)
 	toastOverlay := toast.New()
 
-	// --- Fyne GUI ---
 	a := fyneApp.NewWithID("com.wispr-vibe.app")
 	a.Settings().SetTheme(theme.DarkTheme())
 
@@ -52,13 +49,11 @@ func main() {
 	w.Resize(fyne.NewSize(420, 320))
 	w.CenterOnScreen()
 
-	// Hotkey combo from config
 	hotkeyCombo := cfg.Hotkey
 	if hotkeyCombo == "" {
 		hotkeyCombo = "Ctrl+Shift+R"
 	}
 
-	// UI widgets
 	statusLabel := widget.NewLabel(fmt.Sprintf("🟢 Ready — press %s or click Record", hotkeyCombo))
 	statusLabel.Alignment = fyne.TextAlignCenter
 	statusLabel.TextStyle = fyne.TextStyle{Bold: true}
@@ -76,8 +71,6 @@ func main() {
 	recordBtn := widget.NewButton("🎙 Record", nil)
 	recordBtn.Importance = widget.HighImportance
 
-	// Toggle recording function (shared by button and hotkey)
-	// Must wrap all UI calls in fyne.Do when called from hotkey background thread
 	toggleRecording := func() {
 		fyne.Do(func() {
 			if !recording {
@@ -91,7 +84,6 @@ func main() {
 				statusLabel.SetText(fmt.Sprintf("🎙 Recording... (%s to stop)", hotkeyCombo))
 				resultLabel.SetText("")
 
-				// Show toast overlay at bottom of screen
 				toastOverlay.Show("🎙 Recording...")
 
 				timerDone = make(chan struct{})
@@ -118,20 +110,13 @@ func main() {
 				recordBtn.SetText("⏳ Transcribing...")
 				recordBtn.Disable()
 				statusLabel.SetText("⏳ Processing audio...")
-
-				// Update toast to show processing
 				toastOverlay.SetText("⏳ Transcribing...")
 
 				go func() {
-					// Hide main window so previous app regains focus for paste
-					fyne.Do(func() {
-						w.Hide()
-					})
+					fyne.Do(func() { w.Hide() })
 					time.Sleep(300 * time.Millisecond)
 
 					text, err := application.StopAndProcess(ctx)
-
-					// Hide toast
 					toastOverlay.Hide()
 
 					fyne.Do(func() {
@@ -152,18 +137,13 @@ func main() {
 
 	recordBtn.OnTapped = toggleRecording
 
-	// Register global hotkey from config
 	hk, err := hotkey.RegisterFromString(1, hotkeyCombo, toggleRecording)
 	if err != nil {
-		log.Warn("global hotkey registration failed", "error", err, "hotkey", hotkeyCombo)
-	} else {
-		log.Info("global hotkey registered", "hotkey", hotkeyCombo)
+		log.Warn("hotkey registration failed", "error", err)
 	}
 
-	// Settings button
 	settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
 		showSettings(a, cfg, w, func() {
-			// Re-register hotkey after settings change
 			if hk != nil {
 				hk.Unregister()
 			}
@@ -172,21 +152,16 @@ func main() {
 				newCombo = "Ctrl+Shift+R"
 			}
 			newHk, err := hotkey.RegisterFromString(1, newCombo, toggleRecording)
-			if err != nil {
-				log.Warn("hotkey re-register failed", "error", err)
-			} else {
+			if err == nil {
 				hk = newHk
-				log.Info("hotkey updated", "hotkey", newCombo)
 			}
 		})
 	})
 
-	// Minimize button
 	minimizeBtn := widget.NewButtonWithIcon("", theme.ContentRemoveIcon(), func() {
 		w.Hide()
 	})
 
-	// Layout
 	header := container.NewHBox(
 		widget.NewLabelWithStyle("Wispr Vibe", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		layout.NewSpacer(),
@@ -212,16 +187,9 @@ func main() {
 	)
 
 	w.SetContent(content)
+	w.SetCloseIntercept(func() { w.Hide() })
 
-	// Close hides to tray instead of quitting
-	w.SetCloseIntercept(func() {
-		w.Hide()
-	})
-
-	// System tray
-	if desk, ok := a.(interface {
-		SetSystemTrayMenu(menu *fyne.Menu)
-	}); ok {
+	if desk, ok := a.(interface{ SetSystemTrayMenu(menu *fyne.Menu) }); ok {
 		desk.SetSystemTrayMenu(fyne.NewMenu("Wispr Vibe",
 			fyne.NewMenuItem("Show", func() { w.Show() }),
 			fyne.NewMenuItem("Quit", func() {
@@ -236,7 +204,6 @@ func main() {
 
 	w.ShowAndRun()
 
-	// Cleanup
 	if hk != nil {
 		hk.Unregister()
 	}
@@ -257,7 +224,6 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 		currentHotkey = "Ctrl+Shift+R"
 	}
 
-	// Hotkey entry
 	hotkeyEntry := widget.NewEntry()
 	hotkeyEntry.SetText(currentHotkey)
 	hotkeyEntry.SetPlaceHolder("Ex: Ctrl+Shift+R, Alt+Z, Ctrl+F9")
@@ -275,9 +241,7 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 			return
 		}
 
-		// Validate
-		_, _, err := hotkey.ParseHotkey(newCombo)
-		if err != nil {
+		if _, _, err := hotkey.ParseHotkey(newCombo); err != nil {
 			saveStatus.SetText(fmt.Sprintf("❌ Invalid: %v", err))
 			return
 		}
@@ -289,8 +253,6 @@ func showSettings(a fyne.App, cfg *config.Config, parent fyne.Window, onHotkeyCh
 		}
 
 		saveStatus.SetText(fmt.Sprintf("✅ Hotkey saved: %s", newCombo))
-
-		// Notify to re-register
 		if onHotkeyChanged != nil {
 			onHotkeyChanged()
 		}

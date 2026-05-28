@@ -9,25 +9,24 @@ import (
 var (
 	user32         = syscall.NewLazyDLL("user32.dll")
 	sendInput      = user32.NewProc("SendInput")
-	getClipboard   = user32.NewProc("GetClipboardData")
 	openClipboard  = user32.NewProc("OpenClipboard")
 	closeClipboard = user32.NewProc("CloseClipboard")
 	emptyClipboard = user32.NewProc("EmptyClipboard")
 	setClipboard   = user32.NewProc("SetClipboardData")
 
-	kernel32    = syscall.NewLazyDLL("kernel32.dll")
-	globalAlloc = kernel32.NewProc("GlobalAlloc")
-	globalLock  = kernel32.NewProc("GlobalLock")
+	kernel32     = syscall.NewLazyDLL("kernel32.dll")
+	globalAlloc  = kernel32.NewProc("GlobalAlloc")
+	globalLock   = kernel32.NewProc("GlobalLock")
 	globalUnlock = kernel32.NewProc("GlobalUnlock")
 )
 
 const (
-	inputKeyboard  = 1
-	keyEventKeyUp  = 0x0002
-	vkControl      = 0x11
-	vkV            = 0x56
-	cfUnicodeText  = 13
-	gmemMoveable   = 0x0002
+	inputKeyboard = 1
+	keyEventKeyUp = 0x0002
+	vkControl     = 0x11
+	vkV           = 0x56
+	cfUnicodeText = 13
+	gmemMoveable  = 0x0002
 )
 
 type keyboardInput struct {
@@ -44,9 +43,7 @@ type input struct {
 	padding   [8]byte
 }
 
-// CopyToClipboard places text in the Windows clipboard using Win32 API.
 func CopyToClipboard(text string) error {
-	// Convert to UTF-16
 	utf16, err := syscall.UTF16FromString(text)
 	if err != nil {
 		return err
@@ -63,7 +60,6 @@ func CopyToClipboard(text string) error {
 		return syscall.GetLastError()
 	}
 
-	// Copy UTF-16 data
 	dst := unsafe.Slice((*uint16)(unsafe.Pointer(lock)), len(utf16))
 	copy(dst, utf16)
 	globalUnlock.Call(hMem)
@@ -83,26 +79,21 @@ func CopyToClipboard(text string) error {
 	return nil
 }
 
-// PasteToActiveWindow simulates Ctrl+V to paste clipboard into active window.
 func PasteToActiveWindow() error {
 	time.Sleep(50 * time.Millisecond)
 
 	inputs := make([]input, 4)
 
-	// Ctrl down
 	inputs[0].inputType = inputKeyboard
 	inputs[0].ki.wVk = vkControl
 
-	// V down
 	inputs[1].inputType = inputKeyboard
 	inputs[1].ki.wVk = vkV
 
-	// V up
 	inputs[2].inputType = inputKeyboard
 	inputs[2].ki.wVk = vkV
 	inputs[2].ki.dwFlags = keyEventKeyUp
 
-	// Ctrl up
 	inputs[3].inputType = inputKeyboard
 	inputs[3].ki.wVk = vkControl
 	inputs[3].ki.dwFlags = keyEventKeyUp
@@ -119,8 +110,6 @@ func PasteToActiveWindow() error {
 	return nil
 }
 
-// TypeText copies text to clipboard and pastes it into the active window.
-// This is the main function for "type where cursor is".
 func TypeText(text string) error {
 	if err := CopyToClipboard(text); err != nil {
 		return err
