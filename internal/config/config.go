@@ -24,6 +24,10 @@ type Config struct {
 	// MiniMax specific
 	MiniMaxGroupID string `json:"minimax_group_id"`
 
+	// Local Whisper settings
+	WhisperExePath   string `json:"whisper_exe_path"`
+	WhisperModelPath string `json:"whisper_model_path"`
+
 	// Audio settings
 	SampleRate int `json:"sample_rate"`
 
@@ -137,9 +141,10 @@ func RunSetup(cfg *Config) error {
 	// API Provider
 	fmt.Println()
 	fmt.Println("Choose your STT provider:")
-	fmt.Println("  [1] OpenAI   (whisper-1, gpt-4o-transcribe)")
-	fmt.Println("  [2] MiniMax  (hailuo)")
-	fmt.Print("→ [1/2, default=1]: ")
+	fmt.Println("  [1] OpenAI        (whisper-1, gpt-4o-transcribe — needs API key)")
+	fmt.Println("  [2] MiniMax       (hailuo — needs API key + group ID)")
+	fmt.Println("  [3] Local Whisper (100% offline, free — needs whisper.cpp)")
+	fmt.Print("→ [1/2/3, default=3]: ")
 	providerChoice, _ := reader.ReadString('\n')
 	providerChoice = strings.TrimSpace(providerChoice)
 
@@ -201,6 +206,28 @@ func RunSetup(cfg *Config) error {
 		default:
 			cfg.WhisperModel = "whisper-1"
 		}
+
+	case "3", "":
+		cfg.Provider = "local"
+		cfg.STTEngine = "whisper_local"
+		cfg.WhisperAPIKey = "not-needed"
+		fmt.Println()
+		fmt.Println("Local Whisper (whisper.cpp) — runs 100% offline!")
+		fmt.Println()
+		fmt.Println("Path to whisper.cpp executable (leave empty to auto-detect):")
+		fmt.Print("→ ")
+		exePath, _ := reader.ReadString('\n')
+		exePath = strings.TrimSpace(exePath)
+		cfg.WhisperExePath = exePath
+
+		fmt.Println()
+		fmt.Println("Path to model .bin file (leave empty to auto-detect):")
+		fmt.Println("  Recommended: ggml-base.bin (~148MB) or ggml-small.bin (~488MB)")
+		fmt.Println("  Download: https://huggingface.co/ggerganov/whisper.cpp/tree/main")
+		fmt.Print("→ ")
+		modelPath, _ := reader.ReadString('\n')
+		modelPath = strings.TrimSpace(modelPath)
+		cfg.WhisperModelPath = modelPath
 	}
 
 	// Language

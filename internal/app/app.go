@@ -24,7 +24,20 @@ type App struct {
 }
 
 func New(cfg *config.Config, log *slog.Logger) *App {
-	transcriber := stt.NewWhisperAPI(cfg.WhisperAPIKey, cfg.WhisperAPIURL, cfg.WhisperModel)
+	var transcriber stt.Transcriber
+	switch cfg.STTEngine {
+	case "whisper_local":
+		t, err := stt.NewWhisperLocal(cfg.WhisperExePath, cfg.WhisperModelPath)
+		if err != nil {
+			log.Warn("local whisper not available, will fail on transcribe", "error", err)
+			transcriber = stt.NewWhisperAPI(cfg.WhisperAPIKey, cfg.WhisperAPIURL, cfg.WhisperModel)
+		} else {
+			transcriber = t
+			log.Info("using local whisper", "exe", t.Name())
+		}
+	default:
+		transcriber = stt.NewWhisperAPI(cfg.WhisperAPIKey, cfg.WhisperAPIURL, cfg.WhisperModel)
+	}
 
 	pipeline := processor.DefaultPipeline()
 	if cfg.FixPunctuation {
