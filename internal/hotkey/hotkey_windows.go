@@ -2,6 +2,7 @@ package hotkey
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -12,6 +13,9 @@ var (
 	registerHotKey   = user32.NewProc("RegisterHotKey")
 	unregisterHotKey = user32.NewProc("UnregisterHotKey")
 	getMessage       = user32.NewProc("GetMessageW")
+	postThreadMsg    = user32.NewProc("PostThreadMessageW")
+	kernel32         = syscall.NewLazyDLL("kernel32.dll")
+	getCurrentTID    = kernel32.NewProc("GetCurrentThreadId")
 )
 
 const (
@@ -21,6 +25,7 @@ const (
 	ModWin     = 0x0008
 
 	wmHotKey = 0x0312
+	wmQuit   = 0x0012
 )
 
 type msg struct {
@@ -35,24 +40,63 @@ type msg struct {
 // Listener listens for a registered global hotkey.
 type Listener struct {
 	id       int32
+	threadID uint32
 	stopCh   chan struct{}
 	callback func()
 }
 
 // Register registers a global hotkey and calls callback when triggered.
+// Both RegisterHotKey and GetMessage run on the SAME locked OS thread.
 func Register(id int32, modifiers uint32, vk uint32, callback func()) (*Listener, error) {
-	ret, _, err := registerHotKey.Call(0, uintptr(id), uintptr(modifiers), uintptr(vk))
-	if ret == 0 {
-		return nil, fmt.Errorf("RegisterHotKey failed: %w", err)
-	}
-
 	l := &Listener{
 		id:       id,
 		stopCh:   make(chan struct{}),
 		callback: callback,
 	}
 
-	go l.listen()
+	errCh := make(chan error, 1)
+
+	go func() {
+		// Lock this goroutine to a single OS thread — critical for Win32 message loop
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		// Get thread ID for PostThreadMessage on unregister
+		tid, _, _ := getCurrentTID.Call()
+		l.threadID = uint32(tid)
+
+		// Register hotkey on THIS thread
+		ret, _, err := registerHotKey.Call(0, uintptr(id), uintptr(modifiers), uintptr(vk))
+		if ret == 0 {
+			errCh <- fmt.Errorf("RegisterHotKey failed: %w", err)
+			return
+		}
+		errCh <- nil
+
+		// Message loop on same thread — receives WM_HOTKEY
+		var m msg
+		for {
+			ret, _, _ := getMessage.Call(
+				uintptr(unsafe.Pointer(&m)),
+				0, 0, 0,
+			)
+			if ret == 0 || ret == uintptr(^uintptr(0)) {
+				break
+			}
+			if m.message == wmHotKey && int32(m.wParam) == id {
+				l.callback()
+			}
+			if m.message == wmQuit {
+				break
+			}
+		}
+
+		unregisterHotKey.Call(0, uintptr(id))
+	}()
+
+	if err := <-errCh; err != nil {
+		return nil, err
+	}
 	return l, nil
 }
 
@@ -65,31 +109,12 @@ func RegisterFromString(id int32, combo string, callback func()) (*Listener, err
 	return Register(id, mods, vk, callback)
 }
 
-func (l *Listener) listen() {
-	var m msg
-	for {
-		select {
-		case <-l.stopCh:
-			return
-		default:
-		}
-		ret, _, _ := getMessage.Call(
-			uintptr(unsafe.Pointer(&m)),
-			0, 0, 0,
-		)
-		if ret == 0 {
-			return
-		}
-		if m.message == wmHotKey && int32(m.wParam) == l.id {
-			l.callback()
-		}
-	}
-}
-
-// Unregister removes the hotkey.
+// Unregister removes the hotkey and stops the listener.
 func (l *Listener) Unregister() {
-	close(l.stopCh)
-	unregisterHotKey.Call(0, uintptr(l.id))
+	// Post WM_QUIT to the listener thread to break the message loop
+	if l.threadID != 0 {
+		postThreadMsg.Call(uintptr(l.threadID), wmQuit, 0, 0)
+	}
 }
 
 // ParseHotkey parses "Ctrl+Shift+R" → (modifiers, virtualKey, error)

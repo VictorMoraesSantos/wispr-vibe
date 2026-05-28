@@ -169,16 +169,16 @@ func findWhisperModel() string {
 		locations = append(locations, filepath.Join(dir, "models"), dir)
 	}
 
-	// Look for any .bin model file
+	// Look for .bin model file — prefer larger/better models first
 	modelNames := []string{
-		"ggml-base.bin",
-		"ggml-base.en.bin",
-		"ggml-small.bin",
-		"ggml-small.en.bin",
-		"ggml-medium.bin",
-		"ggml-medium.en.bin",
-		"ggml-large-v3.bin",
 		"ggml-large-v3-turbo.bin",
+		"ggml-large-v3.bin",
+		"ggml-medium.bin",
+		"ggml-small.bin",
+		"ggml-base.bin",
+		"ggml-medium.en.bin",
+		"ggml-small.en.bin",
+		"ggml-base.en.bin",
 	}
 
 	for _, loc := range locations {
