@@ -17,3 +17,5 @@ vendor/
 
 # Config with secrets
 config.json
+
+*.exe~

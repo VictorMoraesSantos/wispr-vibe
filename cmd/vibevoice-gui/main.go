@@ -73,59 +73,68 @@ func main() {
 	recordBtn.Importance = widget.HighImportance
 
 	// Toggle recording function (shared by button and hotkey)
+	// Must wrap all UI calls in fyne.Do when called from hotkey background thread
 	toggleRecording := func() {
-		if !recording {
-			if err := application.StartRecording(); err != nil {
-				statusLabel.SetText(fmt.Sprintf("❌ %v", err))
-				return
-			}
-			recording = true
-			recordStart = time.Now()
-			recordBtn.SetText("⏹ Stop & Transcribe")
-			statusLabel.SetText(fmt.Sprintf("🎙 Recording... (%s to stop)", hotkeyCombo))
-			resultLabel.SetText("")
-
-			timerDone = make(chan struct{})
-			go func() {
-				ticker := time.NewTicker(100 * time.Millisecond)
-				defer ticker.Stop()
-				for {
-					select {
-					case <-timerDone:
-						return
-					case <-ticker.C:
-						elapsed := time.Since(recordStart).Truncate(100 * time.Millisecond)
-						timerLabel.SetText(fmt.Sprintf("⏱ %s", elapsed))
-					}
-				}
-			}()
-		} else {
-			recording = false
-			close(timerDone)
-			recordBtn.SetText("⏳ Transcribing...")
-			recordBtn.Disable()
-			statusLabel.SetText("⏳ Processing audio...")
-
-			go func() {
-				// Minimize window so the PREVIOUS app regains focus
-				w.Hide()
-				time.Sleep(300 * time.Millisecond)
-
-				text, err := application.StopAndProcess(ctx)
-				if err != nil {
-					w.Show()
+		fyne.Do(func() {
+			if !recording {
+				if err := application.StartRecording(); err != nil {
 					statusLabel.SetText(fmt.Sprintf("❌ %v", err))
-				} else {
-					// Text was already typed into active window by app.StopAndProcess
-					w.Show()
-					statusLabel.SetText("✅ Text inserted at cursor!")
-					resultLabel.SetText(text)
+					return
 				}
-				recordBtn.SetText("🎙 Record")
-				recordBtn.Enable()
-				timerLabel.SetText("")
-			}()
-		}
+				recording = true
+				recordStart = time.Now()
+				recordBtn.SetText("⏹ Stop & Transcribe")
+				statusLabel.SetText(fmt.Sprintf("🎙 Recording... (%s to stop)", hotkeyCombo))
+				resultLabel.SetText("")
+
+				timerDone = make(chan struct{})
+				go func() {
+					ticker := time.NewTicker(500 * time.Millisecond)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-timerDone:
+							return
+						case <-ticker.C:
+							elapsed := time.Since(recordStart).Truncate(time.Second)
+							fyne.Do(func() {
+								timerLabel.SetText(fmt.Sprintf("⏱ %s", elapsed))
+							})
+						}
+					}
+				}()
+			} else {
+				recording = false
+				close(timerDone)
+				recordBtn.SetText("⏳ Transcribing...")
+				recordBtn.Disable()
+				statusLabel.SetText("⏳ Processing audio...")
+
+				go func() {
+					// Hide window so previous app regains focus for paste
+					fyne.Do(func() {
+						w.Hide()
+					})
+					time.Sleep(300 * time.Millisecond)
+
+					text, err := application.StopAndProcess(ctx)
+
+					fyne.Do(func() {
+						if err != nil {
+							w.Show()
+							statusLabel.SetText(fmt.Sprintf("❌ %v", err))
+						} else {
+							w.Show()
+							statusLabel.SetText("✅ Text inserted at cursor!")
+							resultLabel.SetText(text)
+						}
+						recordBtn.SetText("🎙 Record")
+						recordBtn.Enable()
+						timerLabel.SetText("")
+					})
+				}()
+			}
+		})
 	}
 
 	recordBtn.OnTapped = toggleRecording
