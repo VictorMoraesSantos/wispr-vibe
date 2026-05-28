@@ -13,10 +13,16 @@ type Config struct {
 	// STT engine: "whisper_api" or "whisper_local"
 	STTEngine string `json:"stt_engine"`
 
-	// Whisper API settings
+	// Provider: "openai" or "minimax"
+	Provider string `json:"provider"`
+
+	// API settings
 	WhisperAPIKey  string `json:"whisper_api_key"`
 	WhisperAPIURL  string `json:"whisper_api_url"`
 	WhisperModel   string `json:"whisper_model"`
+
+	// MiniMax specific
+	MiniMaxGroupID string `json:"minimax_group_id"`
 
 	// Audio settings
 	SampleRate int `json:"sample_rate"`
@@ -139,8 +145,9 @@ func RunSetup(cfg *Config) error {
 
 	switch providerChoice {
 	case "2":
-		cfg.WhisperAPIURL = "https://api.minimax.io/v1/audio/transcriptions"
+		cfg.Provider = "minimax"
 		cfg.WhisperModel = "hailuo"
+
 		fmt.Println()
 		fmt.Println("Enter your MiniMax API key:")
 		fmt.Print("→ ")
@@ -150,7 +157,21 @@ func RunSetup(cfg *Config) error {
 			return fmt.Errorf("API key cannot be empty")
 		}
 		cfg.WhisperAPIKey = key
+
+		fmt.Println()
+		fmt.Println("Enter your MiniMax Group ID:")
+		fmt.Println("  (found in your MiniMax dashboard)")
+		fmt.Print("→ ")
+		groupID, _ := reader.ReadString('\n')
+		groupID = strings.TrimSpace(groupID)
+		if groupID == "" {
+			return fmt.Errorf("Group ID cannot be empty")
+		}
+		cfg.MiniMaxGroupID = groupID
+		cfg.WhisperAPIURL = fmt.Sprintf("https://api.minimax.chat/v1/audio/transcriptions?GroupId=%s", groupID)
+
 	default:
+		cfg.Provider = "openai"
 		cfg.WhisperAPIURL = "https://api.openai.com/v1/audio/transcriptions"
 		fmt.Println()
 		fmt.Println("Enter your OpenAI API key (starts with sk-):")
