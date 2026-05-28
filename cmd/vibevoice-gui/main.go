@@ -136,10 +136,8 @@ func main() {
 
 					fyne.Do(func() {
 						if err != nil {
-							w.Show()
 							statusLabel.SetText(fmt.Sprintf("❌ %v", err))
 						} else {
-							w.Show()
 							statusLabel.SetText("✅ Text inserted at cursor!")
 							resultLabel.SetText(text)
 						}
